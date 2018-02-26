@@ -5,12 +5,41 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
     TheMarkerDetector.setDictionary(dict_type,
                                     0.6f); //errorCorrectionRate error correction rate respect to the maximun error correction capability for each dictionary. (default 0.6).
 
+    // set detection mode and minimum marker size
+    nh_node.param<float>("marker_min", markerSizeMin, 0.01);
+    nh_node.param<std::string>("detection_mode", detectionMode, "DM_NORMAL");
+
+    if (detectionMode == "DM_NORMAL"){
+        detectionModeEnum = aruco::DetectionMode::DM_NORMAL;
+    } else if (detectionMode == "DM_FAST"){
+        detectionModeEnum = aruco::DetectionMode::DM_FAST;
+    } else if (detectionMode == "DM_VIDEO_FAST"){
+        detectionModeEnum = aruco::DetectionMode::DM_VIDEO_FAST;
+    }
+    //TheMarkerDetector.setDetectionMode(detectionModeEnum, markerSizeMin);
+
     nh_node.param<std::string>("camera_frame", camera_frame, "");
 
-    nh_node.param<std::string>("TheCameraParameters_path", TheCameraParameters_path, "");
-    TheCameraParameters.readFromXMLFile(TheCameraParameters_path);
+    // load camera parameters from camerainfo or YAML file
+    nh_node.param<bool>("use_camera_info", useCamInfo, true);
+    if(useCamInfo)
+    {
+        sensor_msgs::CameraInfoConstPtr msg = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("camera_info", nh_node);//, 10.0);
+        nh_node.param<bool>("image_is_rectified", useRectifiedImages, true);
+        TheCameraParameters = rosCameraInfo2ArucoCamParams(*msg, useRectifiedImages);
+    }
+    else {
+        try {
+            nh_node.param<std::string>("TheCameraParameters_path", TheCameraParameters_path, "");
+            TheCameraParameters.readFromXMLFile(TheCameraParameters_path);
+        } catch (cv::Exception) {
+            ROS_ERROR("Cannot load camera parameters!");
+        }
+    }
 
     nh_node.param<float>("markerSizeMeters", markerSizeMeters, -1);
+    nh_node.param<bool>("invert_image", invertImage, -1);
+
 
     sub = nh_node.subscribe("image_raw", 1, &MarkerPosePublisher::callBackColor, this);
 
@@ -34,6 +63,10 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
     catch (cv_bridge::Exception &e) {
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
+    }
+
+    if(invertImage){
+        bitwise_not ( cv_ptr->image, cv_ptr->image );
     }
 
     ros::Time curr_stamp(ros::Time::now());
@@ -73,8 +106,8 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
                                                     TheCameraParameters.Distorsion, false);
 
         detected_markers[i].draw(cv_ptr->image, cv::Scalar(0, 0, 255), 3, true, true);
-//     aruco::CvDrawingUtils::draw3dCube(cv_ptr->image, detected_markers[i], TheCameraParameters);
-//     aruco::CvDrawingUtils::draw3dAxis(cv_ptr->image, detected_markers[i], TheCameraParameters);
+//        aruco::CvDrawingUtils::draw3dCube(cv_ptr->image, detected_markers[i], TheCameraParameters);
+        aruco::CvDrawingUtils::draw3dAxis(cv_ptr->image, detected_markers[i], TheCameraParameters);
 
         tf::Transform object_transform = arucoMarker2Tf(detected_markers[i]);
 
@@ -165,6 +198,43 @@ void MarkerPosePublisher::publish_marker(geometry_msgs::Pose marker_pose, int ma
     markers_pub_tf.publish(marker);
 }
 
+aruco::CameraParameters MarkerPosePublisher::rosCameraInfo2ArucoCamParams(const sensor_msgs::CameraInfo& cam_info,
+                                                                bool useRectifiedParameters)
+{
+    cv::Mat cameraMatrix(3, 3, CV_64FC1);
+    cv::Mat distorsionCoeff(4, 1, CV_64FC1);
+    cv::Size size(cam_info.height, cam_info.width);
+
+    if ( useRectifiedParameters )
+    {
+        cameraMatrix.setTo(0);
+        cameraMatrix.at<double>(0,0) = cam_info.P[0];   cameraMatrix.at<double>(0,1) = cam_info.P[1];   cameraMatrix.at<double>(0,2) = cam_info.P[2];
+        cameraMatrix.at<double>(1,0) = cam_info.P[4];   cameraMatrix.at<double>(1,1) = cam_info.P[5];   cameraMatrix.at<double>(1,2) = cam_info.P[6];
+        cameraMatrix.at<double>(2,0) = cam_info.P[8];   cameraMatrix.at<double>(2,1) = cam_info.P[9];   cameraMatrix.at<double>(2,2) = cam_info.P[10];
+
+        for(int i=0; i<4; ++i)
+            distorsionCoeff.at<double>(i, 0) = 0;
+    }
+    else
+    {
+        for(int i=0; i<9; ++i)
+            cameraMatrix.at<double>(i%3, i-(i%3)*3) = cam_info.K[i];
+
+        if(cam_info.D.size() == 4)
+        {
+            for(int i=0; i<4; ++i)
+                distorsionCoeff.at<double>(i, 0) = cam_info.D[i];
+        }
+        else
+        {
+            ROS_WARN("length of camera_info D vector is not 4, assuming zero distortion...");
+            for(int i=0; i<4; ++i)
+                distorsionCoeff.at<double>(i, 0) = 0;
+        }
+    }
+
+    return aruco::CameraParameters(cameraMatrix, distorsionCoeff, size);
+}
 
 
 

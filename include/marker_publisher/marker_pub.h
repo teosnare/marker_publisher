@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -15,10 +16,16 @@ class MarkerPosePublisher {
     aruco::CameraParameters TheCameraParameters;
     aruco::MarkerDetector TheMarkerDetector;
     std::string dict_type;
+    float markerSizeMin;
+    std::string detectionMode;
+    aruco::DetectionMode detectionModeEnum;
     float markerSizeMeters;
     float marker_id_temp = -1;
     std::string TheCameraParameters_path;
+    bool useCamInfo;
+    bool useRectifiedImages;
     std::string camera_frame;
+    bool invertImage;
 
 public:
     MarkerPosePublisher();
@@ -28,6 +35,9 @@ public:
     tf::Transform arucoMarker2Tf(const aruco::Marker &);
 
     void publish_marker(geometry_msgs::Pose, int);
+
+    aruco::CameraParameters rosCameraInfo2ArucoCamParams(const sensor_msgs::CameraInfo& cam_info,
+                                                         bool useRectifiedParameters);
 
 protected:
     ros::NodeHandle nh_node;
