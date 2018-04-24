@@ -5,8 +5,12 @@ project(marker_publisher)
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++1z)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Ofast -march=native")
-set(aruco_INCLUDE_DIRS "/usr/local/include/aruco")
-set(aruco_LIB_DIRS "/usr/local/lib/libaruco.so")
+#set(aruco_INCLUDE_DIRS "/usr/local/include/aruco")
+#set(aruco_LIB_DIRS "/usr/local/lib/libaruco.so")
+
+set(aruco_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/aruco/distrib/include/aruco")
+set(aruco_LIB_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/aruco/distrib/lib/libaruco.so")
+
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)

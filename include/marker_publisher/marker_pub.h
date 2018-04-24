@@ -8,6 +8,7 @@
 #include <aruco.h>
 #include <tf/transform_broadcaster.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseWithCovariance.h>
 #include <marker_publisher/MarkerArray.h>
 #include <tf/transform_listener.h>
@@ -34,7 +35,7 @@ public:
 
     tf::Transform arucoMarker2Tf(const aruco::Marker &);
 
-    void publish_marker(geometry_msgs::Pose, int);
+    void publish_marker(visualization_msgs::Marker& marker, geometry_msgs::Pose, int, float);
 
     aruco::CameraParameters rosCameraInfo2ArucoCamParams(const sensor_msgs::CameraInfo& cam_info,
                                                          bool useRectifiedParameters);
@@ -43,8 +44,11 @@ protected:
     ros::NodeHandle nh_node;
     ros::Subscriber sub;
     ros::Publisher markers_pub_tf;
+    ros::Publisher markers_pub_tf_array;
     ros::Publisher markers_pub_array;
     ros::Publisher markers_pub_debug;
+
+    visualization_msgs::MarkerArray::Ptr vis_marker_pub;
     marker_publisher::MarkerArray::Ptr marker_msg_pub;
 };
 

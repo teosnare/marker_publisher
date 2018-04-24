@@ -44,6 +44,7 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
     sub = nh_node.subscribe("image_raw", 1, &MarkerPosePublisher::callBackColor, this);
 
     markers_pub_tf = nh_node.advertise<visualization_msgs::Marker>("Estimated_marker", 1);
+    markers_pub_tf_array = nh_node.advertise<visualization_msgs::MarkerArray>("Estimated_marker_array", 1);
     markers_pub_array = nh_node.advertise<marker_publisher::MarkerArray>("MarkerArray", 1);
     markers_pub_debug = nh_node.advertise<sensor_msgs::Image>("debug", 1);
 
@@ -51,6 +52,7 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
     //The same frame_id & seq for every marker in each frame
     marker_msg_pub->header.frame_id = camera_frame;
     marker_msg_pub->header.seq = 0;
+    vis_marker_pub = visualization_msgs::MarkerArray::Ptr(new visualization_msgs::MarkerArray());
 }
 
 void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
@@ -80,6 +82,9 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
     marker_msg_pub->header.stamp = curr_stamp;
     marker_msg_pub->header.seq++;
 
+  vis_marker_pub->markers.clear();
+  vis_marker_pub->markers.resize(detected_markers.size());
+
     for (size_t i = 0; i < detected_markers.size(); ++i) {
         marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
         marker_i.idx = detected_markers[i].id;
@@ -95,14 +100,12 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         o << "marker_" << markerId;
         std::string o_str = o.str();
 
-        marker_id_temp = -1.0f;
-        nh_node.param<float>(o_str, marker_id_temp, -1);
-
-        if (marker_id_temp != -1)
-            detected_markers[i].calculateExtrinsics(marker_id_temp, TheCameraParameters.CameraMatrix,
-                                                    TheCameraParameters.Distorsion, false);
-        else
-            detected_markers[i].calculateExtrinsics(markerSizeMeters, TheCameraParameters.CameraMatrix,
+        float tmp_size = markerSizeMeters;
+        nh_node.param<float>(o_str, tmp_size, -1);
+        if (tmp_size <= 0)
+		    tmp_size = markerSizeMeters;
+     
+		detected_markers[i].calculateExtrinsics(tmp_size, TheCameraParameters.CameraMatrix,
                                                     TheCameraParameters.Distorsion, false);
 
         detected_markers[i].draw(cv_ptr->image, cv::Scalar(0, 0, 255), 3, true, true);
@@ -113,6 +116,17 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
 
         br.sendTransform(tf::StampedTransform(object_transform, ros::Time::now(), camera_frame, o_str));
 
+
+     //estimate camera position with inverse transform
+     std::ostringstream oh;
+     oh << "tag_"<< markerId;
+     std::string oh_str = oh.str();
+
+     std::ostringstream oc;
+     oc << "marker_cam_"<< markerId;
+     std::string oc_str = oc.str();
+     tf::Transform inverse_transform = object_transform.inverse();     
+     br.sendTransform(tf::StampedTransform(inverse_transform, ros::Time::now(), oh_str, oc_str));
         geometry_msgs::Pose marker_pose_data;
 
         const tf::Vector3 marker_origin = object_transform.getOrigin();
@@ -126,7 +140,9 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         marker_pose_data.orientation.z = marker_quaternion.getZ();
         marker_pose_data.orientation.w = marker_quaternion.getW();
 
-        publish_marker(marker_pose_data, markerId);
+
+	    visualization_msgs::Marker& vis_marker_i = vis_marker_pub->markers.at(i);
+    	publish_marker(vis_marker_i, marker_pose_data, markerId, tmp_size);
 
         //Publish markers
         marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
@@ -137,6 +153,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
     // only publish if markers detected
     if(detected_markers.size() > 0) {
         markers_pub_array.publish(marker_msg_pub);
+	    markers_pub_tf_array.publish(vis_marker_pub);
     }
 
     // publish debug image with markers
@@ -174,8 +191,9 @@ tf::Transform MarkerPosePublisher::arucoMarker2Tf(const aruco::Marker &marker) {
     return tf::Transform(marker_tf_rot, marker_tf_tran);
 }
 
-void MarkerPosePublisher::publish_marker(geometry_msgs::Pose marker_pose, int marker_id) {
-    visualization_msgs::Marker marker;
+void MarkerPosePublisher::publish_marker(visualization_msgs::Marker& marker, geometry_msgs::Pose marker_pose, int marker_id, float size)
+{
+//    visualization_msgs::Marker marker;
     marker.header.frame_id = camera_frame;
     marker.header.stamp = ros::Time::now();
     marker.ns = "basic_shapes";
@@ -184,8 +202,8 @@ void MarkerPosePublisher::publish_marker(geometry_msgs::Pose marker_pose, int ma
     marker.action = visualization_msgs::Marker::ADD;
 
     marker.pose = marker_pose;
-    marker.scale.x = 0.3;
-    marker.scale.y = 0.3;
+    marker.scale.x = size; //0.3;
+    marker.scale.y = size; //0.3;
     marker.scale.z = 0.01;
 
     marker.color.r = 0.0f;
