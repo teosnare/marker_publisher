@@ -38,8 +38,7 @@ MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
     }
 
     nh_node.param<float>("markerSizeMeters", markerSizeMeters, -1);
-    nh_node.param<bool>("invert_image", invertImage, -1);
-
+    nh_node.param<bool>("invert_image", invertImage, false);
 
     sub = nh_node.subscribe("image_raw", 1, &MarkerPosePublisher::callBackColor, this);
 
@@ -89,7 +88,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         marker_publisher::Marker &marker_i = marker_msg_pub->markers.at(i);
         marker_i.idx = detected_markers[i].id;
     }
-
+  
 
     tf::StampedTransform cameraToReference;
     cameraToReference.setIdentity();
@@ -113,9 +112,7 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
         aruco::CvDrawingUtils::draw3dAxis(cv_ptr->image, detected_markers[i], TheCameraParameters);
 
         tf::Transform object_transform = arucoMarker2Tf(detected_markers[i]);
-
         br.sendTransform(tf::StampedTransform(object_transform, ros::Time::now(), camera_frame, o_str));
-
 
      //estimate camera position with inverse transform
      std::ostringstream oh;
