@@ -118,12 +118,13 @@ void MarkerPosePublisher::callBackColor(const sensor_msgs::ImageConstPtr &msg) {
      std::ostringstream oh;
      oh << "tag_"<< markerId;
      std::string oh_str = oh.str();
-
+/*
      std::ostringstream oc;
      oc << "marker_cam_"<< markerId;
      std::string oc_str = oc.str();
      tf::Transform inverse_transform = object_transform.inverse();     
      br.sendTransform(tf::StampedTransform(inverse_transform, ros::Time::now(), oh_str, oc_str));
+*/
         geometry_msgs::Pose marker_pose_data;
 
         const tf::Vector3 marker_origin = object_transform.getOrigin();
