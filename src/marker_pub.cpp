@@ -2,6 +2,8 @@
 
 MarkerPosePublisher::MarkerPosePublisher() : nh_node("~") {
     nh_node.param<std::string>("dict_type", dict_type, "ALL_DICTS");
+    ros::Time::init();
+    
     TheMarkerDetector.setDictionary(dict_type,
                                     0.6f); //errorCorrectionRate error correction rate respect to the maximun error correction capability for each dictionary. (default 0.6).
 
