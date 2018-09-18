@@ -33,7 +33,8 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(OpenCV REQUIRED
 NO_MODULE # should be optional, tells CMake to use config mode
 PATHS /usr/local # look here
-NO_DEFAULT_PATH) # and don't look anywhere else
+)  # on Ubuntu 16+ the NO_DEFAULT_PATH option is not useful
+#NO_DEFAULT_PATH) # and don't look anywhere else
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
